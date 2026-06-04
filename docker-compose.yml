@@ -11,4 +11,3 @@ services:
     environment:
       - LAN_CHAT_ADMIN=admin
       - LAN_CHAT_ADMIN_PASSWORD=admin123
-      - SECRET_KEY=change-this-to-a-random-string

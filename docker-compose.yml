@@ -3,7 +3,7 @@ services:
     container_name: lan-chat
     restart: always
     network_mode: host
-    build: https://github.com/ivamullane-bot/lan-chat/archive/main.tar.gz
+    build: https://ghproxy.com/https://github.com/ivamullane-bot/lan-chat/archive/main.tar.gz
     volumes:
       - /vol1/1000/docker/lan-chat/data:/app/data
     environment:

@@ -1,0 +1,22 @@
+{
+  "admin": {
+    "password": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "is_admin": true,
+    "display_name": "管理员",
+    "avatar": null,
+    "created_at": "2026-06-04T14:52:55.867414",
+    "storage_quota": -1,
+    "used_storage": 0,
+    "permanent_files": []
+  },
+  "TestUser": {
+    "password": "",
+    "is_admin": false,
+    "display_name": "TestUser",
+    "avatar": null,
+    "created_at": "2026-06-04T14:54:14.041266",
+    "storage_quota": 10737418240,
+    "used_storage": 0,
+    "permanent_files": []
+  }
+}

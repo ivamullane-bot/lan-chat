@@ -1,0 +1,1398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LAN Chat</title>
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LAN Chat">
+<meta name="theme-color" content="#0f0f13">
+<style>
+/* ── Reset & Base ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f0f13;
+  --surface: #1a1a24;
+  --surface2: #22222e;
+  --surface3: #2a2a38;
+  --border: #2e2e3e;
+  --text: #e4e4ec;
+  --text2: #9898a8;
+  --text3: #6b6b7b;
+  --accent: #6c5ce7;
+  --accent-hover: #7d6ff0;
+  --accent-bg: rgba(108, 92, 231, 0.12);
+  --green: #00d68f;
+  --green-bg: rgba(0, 214, 143, 0.12);
+  --green-dim: #00b37a;
+  --red: #ff6b6b;
+  --red-bg: rgba(255, 107, 107, 0.12);
+  --orange: #ffa94d;
+  --orange-bg: rgba(255, 169, 77, 0.15);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 2px 16px rgba(0,0,0,0.3);
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif;
+  --mono: "SF Mono", "Cascadia Code", "JetBrains Mono", monospace;
+}
+
+html, body { height: 100%; font-family: var(--font); background: var(--bg); color: var(--text); }
+input, button, textarea { font-family: inherit; }
+a { color: var(--accent); text-decoration: none; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ── Login Screen ────────────────────────────────────────────── */
+#login-screen {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 20% 50%, var(--accent-bg) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 50%, rgba(0,214,143,0.05) 0%, transparent 50%),
+              var(--bg);
+  z-index: 100;
+}
+.login-container {
+  width: min(480px, 92vw); max-height: 90vh;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 40px 36px;
+  box-shadow: var(--shadow); overflow-y: auto;
+}
+.login-header { text-align: center; margin-bottom: 32px; }
+.login-header .logo {
+  display: inline-flex; align-items: center; gap: 12px;
+  font-size: 28px; font-weight: 700; letter-spacing: -0.5px;
+}
+.login-header .logo-icon {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, var(--accent), #a29bfe);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.login-header p { color: var(--text2); font-size: 14px; margin-top: 8px; }
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 20px;
+}
+.user-card {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 16px 8px;
+  background: var(--surface2); border: 1px solid transparent;
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition: all 0.2s; text-align: center;
+}
+.user-card:hover { border-color: var(--accent); background: var(--accent-bg); }
+.user-card .avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #a29bfe);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 600; color: #fff; flex-shrink: 0;
+}
+.user-card .avatar.admin { background: linear-gradient(135deg, var(--orange), #ffd43b); }
+.user-card .uname { font-size: 13px; font-weight: 500; color: var(--text); }
+.user-card .badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 10px;
+  background: var(--surface3); color: var(--text2);
+}
+.user-card .badge.admin-badge { background: var(--orange); color: #000; }
+.user-card .badge.online-badge { background: var(--green-bg); color: var(--green); }
+.user-card .lock-icon { color: var(--text3); font-size: 11px; }
+.new-user-btn {
+  width: 100%; padding: 12px;
+  border: 2px dashed var(--border); border-radius: var(--radius-sm);
+  background: transparent; color: var(--text2); font-size: 14px;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.new-user-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-bg); }
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+.modal {
+  width: min(480px, 90vw); max-height: 85vh; overflow-y: auto;
+  padding: 32px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.modal h3 { font-size: 18px; margin-bottom: 20px; }
+.modal label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 6px; }
+.modal input[type="text"], .modal input[type="password"], .modal input[type="number"] {
+  width: 100%; padding: 10px 14px; margin-bottom: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-size: 14px;
+  outline: none; transition: border 0.2s;
+}
+.modal input:focus { border-color: var(--accent); }
+.modal .hint { font-size: 12px; color: var(--text3); margin-bottom: 14px; margin-top: -10px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+.btn {
+  padding: 10px 24px; border: none; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--surface3); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { opacity: 0.85; }
+.btn-sm { padding: 6px 14px; font-size: 12px; }
+.btn-icon { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; background: transparent; color: var(--text3); border: none; cursor: pointer; transition: all 0.2s; font-size: 14px; }
+.btn-icon:hover { background: var(--surface3); color: var(--text); }
+
+/* ── Chat Layout ─────────────────────────────────────────────── */
+#chat-screen { display: none; height: 100vh; overflow: hidden; }
+.chat-layout { display: flex; height: 100%; }
+
+/* ── Sidebar ────────────────────────────────────────────────── */
+.sidebar {
+  width: 280px; flex-shrink: 0;
+  background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.sidebar-header {
+  padding: 18px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sidebar-header .logo-mini {
+  display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700;
+}
+.sidebar-header .logo-mini .icon {
+  width: 30px; height: 30px;
+  background: linear-gradient(135deg, var(--accent), #a29bfe);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+}
+
+.sidebar-user {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+.sidebar-user .avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 600; color: #fff;
+  background: linear-gradient(135deg, var(--accent), #a29bfe);
+}
+.sidebar-user .avatar.admin { background: linear-gradient(135deg, var(--orange), #ffd43b); }
+.sidebar-user .info { flex: 1; min-width: 0; }
+.sidebar-user .info .name { font-size: 14px; font-weight: 600; }
+.sidebar-user .info .status { font-size: 11px; color: var(--green); }
+
+/* ── Storage Bar ────────────────────────────────────────────── */
+.storage-bar-wrap {
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+}
+.storage-bar-label {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--text3); margin-bottom: 4px;
+}
+.storage-bar-track {
+  height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden;
+}
+.storage-bar-fill {
+  height: 100%; border-radius: 2px; transition: width 0.5s ease;
+  background: linear-gradient(90deg, var(--green), var(--accent));
+}
+.storage-bar-fill.warn { background: linear-gradient(90deg, var(--orange), var(--red)); }
+.storage-bar-fill.danger { background: var(--red); }
+
+.sidebar-user .logout-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 18px; padding: 4px; border-radius: 4px; transition: all 0.2s;
+}
+.sidebar-user .logout-btn:hover { color: var(--red); background: var(--red-bg); }
+.sidebar-user .switch-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 14px; padding: 4px; border-radius: 4px; transition: all 0.2s;
+}
+.sidebar-user .switch-btn:hover { color: var(--accent); background: var(--accent-bg); }
+
+.sidebar-section-title {
+  padding: 14px 20px 6px; display: flex; justify-content: space-between;
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.8px; color: var(--text3);
+}
+.sidebar-section-title span.online-count { color: var(--green); }
+
+.user-list { flex: 1; overflow-y: auto; padding: 2px 8px; }
+
+.user-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px; border-radius: var(--radius-sm); cursor: default;
+}
+.user-item .avatar-mini {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600; color: #fff; background: var(--accent);
+}
+.user-item .avatar-mini.admin { background: linear-gradient(135deg, var(--orange), #ffd43b); }
+.user-item .name { font-size: 13px; font-weight: 500; }
+.user-item .admin-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 6px;
+  background: var(--orange); color: #000; margin-left: auto;
+}
+
+.sidebar-footer {
+  padding: 10px 12px; border-top: 1px solid var(--border);
+  display: flex; gap: 6px;
+}
+.sidebar-footer .nav-btn {
+  flex: 1; padding: 7px 6px; border: none; border-radius: var(--radius-sm);
+  background: var(--surface2); color: var(--text2);
+  font-size: 12px; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;
+}
+.sidebar-footer .nav-btn:hover { background: var(--surface3); color: var(--text); }
+.sidebar-footer .nav-btn.active { background: var(--accent-bg); color: var(--accent); }
+
+/* ── Main Chat ──────────────────────────────────────────────── */
+.main-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.chat-header {
+  padding: 14px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.chat-header .title { font-size: 15px; font-weight: 600; }
+.chat-header .title small { font-weight: 400; color: var(--text2); font-size: 13px; }
+.chat-header .actions { display: flex; gap: 8px; }
+.chat-header .actions .badge-btn {
+  padding: 4px 12px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface2); color: var(--text2); font-size: 12px;
+  cursor: pointer; transition: all 0.2s;
+}
+.chat-header .actions .badge-btn:hover { background: var(--surface3); color: var(--text); }
+
+/* ── Messages ───────────────────────────────────────────────── */
+.messages-area {
+  flex: 1; overflow-y: auto; padding: 16px 24px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.message-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 4px 0; max-width: 88%; position: relative;
+}
+.message-row.self { flex-direction: row-reverse; align-self: flex-end; }
+.message-row.self .msg-bubble {
+  background: var(--accent); color: #fff; border-bottom-right-radius: 4px;
+}
+.message-row .msg-avatar {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: #fff;
+  background: linear-gradient(135deg, var(--accent), #a29bfe); margin-top: 2px;
+}
+.message-row .msg-avatar.admin { background: linear-gradient(135deg, var(--orange), #ffd43b); }
+
+.msg-content { min-width: 0; }
+.msg-meta {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text3); margin-bottom: 2px; padding: 0 4px;
+}
+.msg-meta .author { font-weight: 600; color: var(--text2); }
+.message-row.self .msg-meta { flex-direction: row-reverse; }
+
+.msg-bubble {
+  padding: 8px 14px; border-radius: 12px;
+  background: var(--surface2); font-size: 14px; line-height: 1.55;
+  word-break: break-word; border-bottom-left-radius: 4px;
+}
+.msg-time { font-size: 10px; color: var(--text3); padding: 2px 4px; display: none; }
+.message-row:hover .msg-time { display: block; }
+
+/* Forward label */
+.forward-label {
+  font-size: 11px; color: var(--text2); padding: 2px 4px 4px 4px; display: flex; align-items: center; gap: 4px;
+}
+.forward-label .icon { color: var(--accent); }
+.msg-row-actions { display: flex; gap: 2px; align-items: center; }
+.msg-action-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 11px; padding: 2px 6px; border-radius: 4px; transition: all 0.15s;
+  opacity: 0;
+}
+.message-row:hover .msg-action-btn { opacity: 1; }
+.msg-action-btn:hover { background: var(--surface3); color: var(--text); }
+
+/* DM button in user list */
+.user-item .dm-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 13px; padding: 2px 6px; border-radius: 4px; transition: all 0.15s;
+  margin-left: auto;
+}
+.user-item .dm-btn:hover { background: var(--accent-bg); color: var(--accent); }
+
+.message-row .msg-del-btn {
+  position: absolute; top: 4px; right: 4px;
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 11px; padding: 2px; opacity: 0; transition: opacity 0.2s;
+}
+.message-row:hover .msg-del-btn { opacity: 1; }
+
+.system-msg { text-align: center; font-size: 12px; color: var(--text3); padding: 6px 0; }
+.system-msg span {
+  background: var(--surface2); padding: 3px 14px; border-radius: 10px;
+}
+
+/* File card in message */
+.file-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; margin-top: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition: all 0.2s; max-width: 320px;
+}
+.file-card:hover { border-color: var(--accent); }
+.file-card .file-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--accent-bg); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.file-card .file-info { flex: 1; min-width: 0; }
+.file-card .file-info .name { font-size: 13px; font-weight: 500; }
+.file-card .file-info .size { font-size: 11px; color: var(--text3); }
+.file-card .file-actions { display: flex; gap: 4px; }
+
+.image-preview {
+  max-width: 280px; max-height: 280px;
+  border-radius: var(--radius-sm); margin-top: 4px;
+  cursor: pointer; transition: transform 0.2s;
+}
+.image-preview:hover { transform: scale(1.02); }
+
+/* QR Code Popup */
+.qr-popup {
+  position: fixed; inset: 0; z-index: 250;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.2s;
+}
+.qr-popup .qr-box {
+  background: #fff; padding: 28px; border-radius: 16px;
+  text-align: center; max-width: 320px;
+}
+.qr-popup .qr-box canvas { display: block; margin: 0 auto; }
+.qr-popup .qr-box .text { color: #333; font-size: 13px; margin-top: 12px; word-break: break-all; }
+.qr-popup .qr-box .sub { color: #888; font-size: 11px; margin-top: 4px; }
+
+/* Permanent badge */
+.permanent-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10px; padding: 1px 6px; border-radius: 6px;
+  background: var(--orange-bg); color: var(--orange); margin-left: 6px;
+}
+
+/* ── Input Area ─────────────────────────────────────────────── */
+.input-area { padding: 12px 24px; border-top: 1px solid var(--border); background: var(--surface); }
+.input-wrapper {
+  display: flex; align-items: flex-end; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 3px 3px 3px 14px;
+  transition: border 0.2s;
+}
+.input-wrapper:focus-within { border-color: var(--accent); }
+.input-wrapper textarea {
+  flex: 1; border: none; background: none; resize: none;
+  color: var(--text); font-size: 14px; line-height: 1.5;
+  padding: 8px 0; min-height: 20px; max-height: 120px; outline: none;
+}
+.input-wrapper textarea::placeholder { color: var(--text3); }
+.input-actions { display: flex; align-items: center; gap: 2px; }
+.input-actions button {
+  width: 36px; height: 36px; border: none; border-radius: 8px;
+  background: transparent; color: var(--text2); cursor: pointer;
+  font-size: 18px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s;
+}
+.input-actions button:hover { background: var(--surface3); color: var(--text); }
+.input-actions .send-btn { background: var(--accent); color: #fff; width: 40px; height: 40px; }
+.input-actions .send-btn:hover { background: var(--accent-hover); }
+
+.typing-indicator {
+  font-size: 12px; color: var(--text3); padding: 2px 24px; min-height: 20px;
+}
+
+/* ── Drag overlay ───────────────────────────────────────────── */
+.drag-overlay {
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(108, 92, 231, 0.08); backdrop-filter: blur(2px);
+  display: none; align-items: center; justify-content: center;
+}
+.drag-overlay.show { display: flex; }
+.drag-overlay .box {
+  padding: 60px 80px; border: 2px dashed var(--accent);
+  border-radius: 20px; background: var(--surface); text-align: center;
+}
+.drag-overlay .box .icon { font-size: 48px; margin-bottom: 12px; }
+.drag-overlay .box .text { font-size: 18px; font-weight: 500; color: var(--accent); }
+.drag-overlay .box .sub { font-size: 13px; color: var(--text3); margin-top: 4px; }
+
+/* ── File Panel (sidebar) ───────────────────────────────────── */
+.file-list-panel { display: none; flex-direction: column; flex: 1; }
+.file-list-panel.show { display: flex; }
+.file-list-panel .file-list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.file-list-panel .file-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.file-list-panel .file-item:hover { background: var(--surface2); }
+.file-list-panel .file-item .fi-icon { flex-shrink: 0; font-size: 16px; }
+.file-list-panel .file-item .fi-info { flex: 1; min-width: 0; }
+.file-list-panel .file-item .fi-info .fi-name { font-size: 13px; font-weight: 500; }
+.file-list-panel .file-item .fi-info .fi-meta { font-size: 10px; color: var(--text3); }
+.file-list-panel .file-item .fi-actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+/* ── Toast ──────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed; top: 20px; right: 20px; z-index: 300;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+  padding: 10px 18px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500;
+  animation: slideIn 0.25s ease; max-width: 380px;
+}
+.toast.info { background: var(--accent); color: #fff; }
+.toast.success { background: var(--green); color: #000; }
+.toast.error { background: var(--red); color: #fff; }
+
+/* ── Quota admin ────────────────────────────────────────────── */
+.quota-input-group { display: flex; gap: 8px; align-items: center; }
+.quota-input-group input { flex: 1; margin-bottom: 0; }
+.quota-input-group select {
+  padding: 10px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text); font-size: 13px; outline: none;
+}
+
+/* ── Empty states ───────────────────────────────────────────── */
+.empty-state {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; color: var(--text3); gap: 8px;
+}
+.empty-state .icon { font-size: 40px; opacity: 0.4; }
+.empty-state .text { font-size: 14px; }
+
+/* ── Animations ─────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.typing-dots span { animation: pulse 1.4s infinite; display: inline-block; }
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .chat-layout { position: relative; }
+  .sidebar {
+    position: fixed; left: -280px; top: 0; bottom: 0; z-index: 180;
+    width: 260px; transition: left 0.25s ease; box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  }
+  .sidebar.open { left: 0; }
+  .sidebar-backdrop {
+    position: fixed; inset: 0; z-index: 170; background: rgba(0,0,0,0.5);
+    display: none;
+  }
+  .sidebar-backdrop.show { display: block; }
+  .sidebar .sidebar-user .info,
+  .sidebar .storage-bar-wrap,
+  .sidebar .sidebar-section-title span,
+  .sidebar .user-item .name,
+  .sidebar .user-item .admin-tag,
+  .sidebar .sidebar-footer .nav-btn span,
+  .sidebar-header .logo-mini span { display: inline; }
+  .sidebar-footer .nav-btn { font-size: 12px; }
+  .messages-area { padding: 12px; }
+  .message-row { max-width: 95%; }
+  .chat-header { padding: 10px 14px; }
+  .chat-header .title { font-size: 13px; }
+  .input-area { padding: 8px 12px; }
+  .input-wrapper { padding: 2px 2px 2px 10px; }
+  .login-container { padding: 24px 16px; width: min(420px, 96vw); }
+  .user-grid { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+  .user-card { padding: 12px 6px; }
+  .user-card .avatar { width: 36px; height: 36px; font-size: 14px; }
+  .user-card .uname { font-size: 12px; }
+  .modal { padding: 24px 16px; }
+  .file-card { max-width: 260px; }
+  .image-preview { max-width: 200px; max-height: 200px; }
+  .msg-bubble { font-size: 13px; padding: 6px 12px; }
+
+  /* Menu toggle button for mobile */
+  .menu-toggle {
+    display: inline-flex !important;
+    width: 30px; height: 30px; align-items: center; justify-content: center;
+    background: none; border: none; color: var(--text2); font-size: 18px;
+    cursor: pointer; border-radius: 6px;
+  }
+  .menu-toggle:hover { background: var(--surface2); }
+}
+@media (min-width: 769px) {
+  .menu-toggle { display: none !important; }
+  .sidebar-backdrop { display: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="login-screen">
+  <div class="login-container">
+    <div class="login-header">
+      <div class="logo">
+        <div class="logo-icon">💬</div>
+        <span>LAN Chat</span>
+      </div>
+      <p>局域网即时通讯 · 文件快传 · 存储管理</p>
+    </div>
+    <div id="user-grid" class="user-grid"></div>
+    <button class="new-user-btn" onclick="showNewUserModal()">
+      <span>+</span> 新建用户
+    </button>
+  </div>
+</div>
+
+<!-- Chat Screen -->
+<div id="chat-screen">
+  <div class="chat-layout">
+    <!-- Sidebar backdrop (mobile) -->
+    <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-mini"><div class="icon">💬</div><span>LAN Chat</span></div>
+      </div>
+
+      <div class="sidebar-user">
+        <div class="avatar" id="my-avatar">U</div>
+        <div class="info">
+          <div class="name" id="my-name">User</div>
+          <div class="status">● 在线</div>
+        </div>
+        <button class="switch-btn" onclick="switchAccount()" title="切换账号">⇄</button>
+        <button class="logout-btn" onclick="logout()" title="退出登录">⏻</button>
+      </div>
+
+      <!-- Storage Bar -->
+      <div class="storage-bar-wrap" id="storage-bar-wrap">
+        <div class="storage-bar-label">
+          <span id="storage-used-text">存储 0B / 10GB</span>
+          <span id="storage-percent-text">0%</span>
+        </div>
+        <div class="storage-bar-track">
+          <div class="storage-bar-fill" id="storage-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div id="main-panel" style="flex:1;display:flex;flex-direction:column;">
+        <div class="sidebar-section-title">
+          <span>在线成员</span>
+          <span class="online-count" id="online-count">0</span>
+        </div>
+        <div class="user-list" id="user-list"></div>
+      </div>
+
+      <div id="file-panel" class="file-list-panel">
+        <div class="sidebar-section-title">
+          <span>文件传输</span>
+          <span id="file-count" style="color:var(--text3)">0</span>
+        </div>
+        <div class="file-list" id="file-list"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="nav-btn active" id="nav-chat" onclick="switchPanel('chat')">💬 <span>聊天</span></button>
+        <button class="nav-btn" id="nav-files" onclick="switchPanel('files')">📁 <span>文件</span></button>
+        <button class="nav-btn" id="nav-admin" onclick="showAdminPanel()" style="display:none;">⚙ <span>管理</span></button>
+      </div>
+    </aside>
+
+    <!-- Main Area -->
+    <main class="main-area">
+      <div class="chat-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+          <div class="title" id="chat-title"># 聊天室 <small id="room-info"></small></div>
+        </div>
+        <div class="actions">
+          <button class="badge-btn" id="dm-back-btn" onclick="leaveDm()" style="display:none;">← 返回</button>
+          <button class="badge-btn" onclick="clearChat()">🗑 清空</button>
+        </div>
+      </div>
+
+      <div class="messages-area" id="messages-area"></div>
+      <div class="typing-indicator" id="typing-indicator"></div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <textarea id="msg-input" rows="1" placeholder="输入消息… Enter发送"
+                    onkeydown="onInputKey(event)" oninput="autoResize(this)"></textarea>
+          <div class="input-actions">
+            <button onclick="document.getElementById('file-input').click()" title="发送文件">📎</button>
+            <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)">
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Drag overlay -->
+<div class="drag-overlay" id="drag-overlay">
+  <div class="box">
+    <div class="icon">📁</div>
+    <div class="text">释放文件到此处上传</div>
+    <div class="sub">支持任意格式，最大 500MB</div>
+  </div>
+</div>
+
+<!-- QR Popup -->
+<div id="qr-popup-container"></div>
+
+<!-- Modals -->
+<div id="modal-container"></div>
+
+<!-- Toast -->
+<div class="toast-container" id="toast-container"></div>
+
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  LAN Chat v2 — Frontend
+// ══════════════════════════════════════════════════════════════════
+
+const STATE = {
+  user: null, socket: null, serverInfo: null,
+  typingTimeout: null, isTyping: false,
+  users: [], messages: [], files: [],
+};
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body && !(body instanceof FormData)) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  } else if (body instanceof FormData) { opts.body = body; }
+  const r = await fetch(path, opts);
+  return r.json();
+}
+
+function toast(msg, type = "info") {
+  const c = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = "0"; el.style.transition = "opacity 0.3s";
+    setTimeout(() => el.remove(), 300);
+  }, 3000);
+}
+
+function showModal(html) {
+  document.getElementById("modal-container").innerHTML =
+    `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">${html}</div>`;
+}
+function closeModal() { document.getElementById("modal-container").innerHTML = ""; }
+function showQrPopup(html) { document.getElementById("qr-popup-container").innerHTML = html; }
+function closeQrPopup() { document.getElementById("qr-popup-container").innerHTML = ""; }
+
+function escapeHtml(t) {
+  const d = document.createElement("div");
+  d.textContent = t; return d.innerHTML;
+}
+
+// ── Login ─────────────────────────────────────────────────────
+async function loadUsers() {
+  const data = await api("GET", "/api/users");
+  STATE.users = data;
+  renderUserGrid();
+}
+
+function renderUserGrid() {
+  const grid = document.getElementById("user-grid");
+  const users = STATE.users;
+  if (!users.length) {
+    grid.innerHTML = `<div style="text-align:center;color:var(--text3);padding:20px;grid-column:1/-1;">暂无用户，创建一个吧</div>`;
+    return;
+  }
+  grid.innerHTML = users.map(u => {
+    const initial = (u.display_name || u.username)[0].toUpperCase();
+    return `<div class="user-card" onclick="loginAs('${u.username}', ${u.has_password})">
+      <div class="avatar ${u.is_admin ? 'admin' : ''}">${initial}</div>
+      <div class="uname">${escapeHtml(u.display_name || u.username)}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;">
+        ${u.is_admin ? '<span class="badge admin-badge">管理员</span>' : ''}
+        ${u.online ? '<span class="badge online-badge">在线</span>' : ''}
+        ${u.has_password ? '<span class="lock-icon">🔒</span>' : ''}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function loginAs(username, hasPassword) {
+  if (hasPassword) {
+    showModal(`<div class="modal">
+      <h3>登录 ${username}</h3>
+      <label>密码</label>
+      <input type="password" id="login-pw" placeholder="输入密码" onkeydown="if(event.key==='Enter')submitLogin('${username}')" autofocus>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn btn-primary" onclick="submitLogin('${username}')">登录</button>
+      </div>
+    </div>`);
+    setTimeout(() => document.getElementById("login-pw")?.focus(), 100);
+    return;
+  }
+  await doLogin(username, "");
+}
+
+async function submitLogin(username) {
+  const pw = document.getElementById("login-pw")?.value || "";
+  closeModal();
+  await doLogin(username, pw);
+}
+
+async function doLogin(username, password) {
+  const res = await api("POST", "/api/login", { username, password });
+  if (!res.ok) { toast(res.error || "登录失败", "error"); return; }
+  STATE.user = res.user;
+  // Save session to localStorage
+  localStorage.setItem("lanchat_user", username);
+  if (password) localStorage.setItem("lanchat_pw", password);
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("chat-screen").style.display = "block";
+  document.getElementById("my-name").textContent = res.user.display_name;
+  const av = document.getElementById("my-avatar");
+  av.textContent = (res.user.display_name || username)[0].toUpperCase();
+  av.classList.toggle("admin", res.user.is_admin);
+  if (res.user.is_admin) document.getElementById("nav-admin").style.display = "flex";
+  const si = await api("GET", "/api/server-info");
+  STATE.serverInfo = si;
+  document.getElementById("room-info").textContent = si.host;
+  connectSocket();
+  loadMessages();
+  loadFileList();
+  loadStorageStats();
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js");
+  }
+}
+
+async function autoLogin() {
+  const savedUser = localStorage.getItem("lanchat_user");
+  if (!savedUser) return false;
+  const savedPw = localStorage.getItem("lanchat_pw") || "";
+  // Check if user still exists
+  const users = await api("GET", "/api/users");
+  const exists = users.find(u => u.username === savedUser);
+  if (!exists) { localStorage.removeItem("lanchat_user"); return false; }
+  // For passwordless or same-password users, auto-login
+  if (!exists.has_password) {
+    await doLogin(savedUser, "");
+    return true;
+  }
+  if (savedPw) {
+    await doLogin(savedUser, savedPw);
+    return true;
+  }
+  // Has password but no saved pw — show quick login on the grid
+  return false;
+}
+
+function showNewUserModal() {
+  showModal(`<div class="modal">
+    <h3>新建用户</h3>
+    <label>用户名</label>
+    <input type="text" id="new-username" placeholder="输入用户名" maxlength="32">
+    <label>显示名称（选填）</label>
+    <input type="text" id="new-display" placeholder="显示名称" maxlength="32">
+    <label>设置密码（选填，留空则无密码登录）</label>
+    <input type="password" id="new-password" placeholder="密码">
+    <div class="hint">不设密码即可免密登录，任何人可使用此账号</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="submitNewUser()">创建并登录</button>
+    </div>
+  </div>`);
+  setTimeout(() => document.getElementById("new-username")?.focus(), 100);
+}
+
+async function submitNewUser() {
+  const username = document.getElementById("new-username").value.trim();
+  const display = document.getElementById("new-display").value.trim();
+  const password = document.getElementById("new-password").value;
+  if (!username) { toast("请输入用户名", "error"); return; }
+  closeModal();
+  await doLogin(username, password);
+}
+
+function logout() {
+  if (STATE.socket) STATE.socket.disconnect();
+  STATE.user = null; STATE.dmTarget = null;
+  localStorage.removeItem("lanchat_user"); localStorage.removeItem("lanchat_pw");
+  document.getElementById("chat-screen").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("messages-area").innerHTML = "";
+  document.getElementById("nav-admin").style.display = "none";
+  loadUsers();
+}
+function switchAccount() {
+  logout(); toast("请选择账号登录", "info");
+}
+
+// ── Sidebar toggle (mobile) ──────────────────────────────────
+function toggleSidebar() {
+  document.querySelector(".sidebar").classList.toggle("open");
+  document.getElementById("sidebar-backdrop").classList.toggle("show");
+}
+
+// ── DM (Private Chat) ─────────────────────────────────────────
+STATE.dmTarget = null;
+
+function startDm(target) {
+  if (target === STATE.user?.username) { toast("不能和自己私聊", "info"); return; }
+  STATE.dmTarget = target;
+  STATE.socket.emit("join_dm", { target });
+  document.getElementById("chat-title").innerHTML = `💬 ${escapeHtml(target)} <small>私聊</small>`;
+  document.getElementById("dm-back-btn").style.display = "inline-flex";
+  loadDmMessages(target);
+  toast(`已进入与 ${target} 的私聊`, "info");
+  document.querySelector(".sidebar")?.classList.remove("open");
+  document.getElementById("sidebar-backdrop")?.classList.remove("show");
+}
+
+function leaveDm() {
+  const target = STATE.dmTarget;
+  if (!target) return;
+  STATE.socket.emit("leave_dm", { target });
+  STATE.dmTarget = null;
+  document.getElementById("chat-title").innerHTML = '# 聊天室 <small id="room-info"></small>';
+  document.getElementById("room-info").textContent = STATE.serverInfo?.host || "";
+  document.getElementById("dm-back-btn").style.display = "none";
+  loadMessages();
+}
+
+function getDmRoom(u1, u2) {
+  return "dm_" + [u1, u2].sort().join("_");
+}
+
+async function loadDmMessages(target) {
+  const room = getDmRoom(STATE.user.username, target);
+  const data = await api("GET", `/api/messages?room=${room}&limit=200`);
+  STATE.messages = data;
+  document.getElementById("messages-area").innerHTML = "";
+  data.forEach(m => renderMessage(m));
+  scrollToBottom();
+}
+
+// ── Forward ───────────────────────────────────────────────────
+async function forwardMessage(msgId) {
+  const original = STATE.messages.find(m => m.id === msgId);
+  if (!original) { toast("消息不存在", "error"); return; }
+  let forwardData = null;
+  if (original.file) {
+    forwardData = {
+      from: original.display_name || original.username,
+      file: original.file,
+      text: original.text,
+    };
+  }
+  const room = STATE.dmTarget
+    ? getDmRoom(STATE.user.username, STATE.dmTarget)
+    : "lobby";
+  STATE.socket.emit("new_message", {
+    text: original.text || "",
+    forward: forwardData,
+    room: room,
+  });
+  toast("已转发", "success");
+}
+
+// ── Socket ────────────────────────────────────────────────────
+function connectSocket() {
+  if (STATE.socket) STATE.socket.disconnect();
+  const s = io();
+  STATE.socket = s;
+  s.on("connect", () => s.emit("join", { username: STATE.user.username }));
+  s.on("new_message", (msg) => {
+    const currentRoom = STATE.dmTarget
+      ? getDmRoom(STATE.user.username, STATE.dmTarget)
+      : "lobby";
+    if (msg.room && msg.room !== currentRoom) return;
+
+    STATE.messages.push(msg);
+    renderMessage(msg);
+    scrollToBottom();
+    if (msg.file && msg.username !== STATE.user.username && !msg.forward) {
+      STATE.files.unshift(msg.file);
+      renderFileList();
+    }
+    if (msg.username !== STATE.user.username && document.hidden) {
+      const prefix = msg.room && msg.room.startsWith("dm") ? "[私聊] " : "";
+      const body = msg.file ? `[文件] ${msg.file.name}` : (msg.forward ? `[转发] ${msg.text}` : msg.text);
+      showNotification(prefix + (msg.display_name || msg.username), body);
+    }
+  });
+  s.on("system_msg", (msg) => { renderSystemMsg(msg); scrollToBottom(); });
+  s.on("user_list", (list) => renderOnlineList(list));
+  s.on("typing_indicator", (d) => {
+    if (d.username === STATE.user.username) return;
+    document.getElementById("typing-indicator").innerHTML =
+      d.typing ? `<span class="typing-dots">${escapeHtml(d.display_name)} 正在输入<span>.</span><span>.</span><span>.</span></span>` : "";
+  });
+  s.on("message_deleted", (d) => {
+    STATE.messages = STATE.messages.filter(m => m.id !== d.id);
+    const el = document.querySelector(`[data-msg-id="${d.id}"]`);
+    if (el) el.remove();
+  });
+  s.on("messages_cleared", () => { STATE.messages = []; document.getElementById("messages-area").innerHTML = ""; toast("消息已清空", "info"); });
+  s.on("kicked", (d) => { toast(d.reason || "账户已被删除", "error"); logout(); });
+  s.on("disconnect", () => toast("连接断开，尝试重连…", "error"));
+}
+
+// ── Messages ──────────────────────────────────────────────────
+async function loadMessages() {
+  const data = await api("GET", "/api/messages?limit=200");
+  STATE.messages = data;
+  document.getElementById("messages-area").innerHTML = "";
+  data.forEach(m => renderMessage(m));
+  scrollToBottom();
+}
+
+function renderMessage(msg) {
+  const area = document.getElementById("messages-area");
+  const isSelf = msg.username === STATE.user.username;
+  const div = document.createElement("div");
+  div.dataset.msgId = msg.id;
+  div.className = "message-row " + (isSelf ? "self" : "");
+
+  const initial = (msg.display_name || msg.username)[0].toUpperCase();
+  const adminCls = msg.is_admin ? "admin" : "";
+  let bubble = "";
+  let forwardLabel = "";
+
+  // Forwarded message
+  if (msg.type === "forward" && msg.forward) {
+    const f = msg.forward;
+    forwardLabel = `<div class="forward-label"><span class="icon">↻</span> 转发了 ${escapeHtml(f.from || '未知用户')} 的消息</div>`;
+    if (f.file) {
+      const ff = f.file;
+      if (ff.is_image) {
+        bubble += `<div><img class="image-preview" src="${ff.preview_url}" alt="${escapeHtml(ff.name)}" onclick="window.open(this.src)" loading="lazy"></div>`;
+      }
+      bubble += `<div class="file-card" onclick="downloadFile('${ff.id}','${escapeHtml(ff.name)}')">
+        <div class="file-icon">${ff.is_image ? '🖼' : '📄'}</div>
+        <div class="file-info"><div class="name">${escapeHtml(ff.name)}</div><div class="size">${ff.size_display}</div></div>
+        <span style="font-size:16px;color:var(--text3);">⬇</span>
+      </div>`;
+    }
+    if (f.text) {
+      bubble = `<div class="msg-bubble">${escapeHtml(f.text)}</div>` + bubble;
+    }
+    if (msg.text) {
+      bubble = `<div class="msg-bubble" style="opacity:0.7;">${escapeHtml(msg.text)}</div>` + bubble;
+    }
+  } else if (msg.type === "file" && msg.file) {
+    const f = msg.file;
+    bubble = `<div class="msg-bubble">${escapeHtml(msg.text || f.name)}</div>`;
+    if (f.is_image) {
+      bubble += `<div style="position:relative;display:inline-block;"><img class="image-preview" src="${f.preview_url}" alt="${escapeHtml(f.name)}" onclick="window.open(this.src)" loading="lazy"></div>`;
+    }
+    const permStar = msg.permanent ? "★" : "☆";
+    bubble += `<div class="file-card" onclick="downloadFile('${f.id}','${escapeHtml(f.name)}')">
+      <div class="file-icon">${f.is_image ? '🖼' : '📄'}</div>
+      <div class="file-info"><div class="name">${escapeHtml(f.name)} ${msg.permanent ? '<span class="permanent-badge">★ 永久</span>' : ''}</div><div class="size">${f.size_display}</div></div>
+      <div class="file-actions">
+        <button class="btn-icon" title="二维码" onclick="event.stopPropagation();showQr('${f.id}','${escapeHtml(f.name)}')" style="font-size:13px">📱</button>
+        <button class="btn-icon" title="${msg.permanent ? '取消永久' : '永久保留'}" onclick="event.stopPropagation();togglePermanent('${f.id}', ${!msg.permanent})" style="font-size:13px">${permStar}</button>
+        <span style="font-size:16px;color:var(--text3);padding:0 4px;">⬇</span>
+      </div>
+    </div>`;
+  } else {
+    bubble = `<div class="msg-bubble">${escapeHtml(msg.text)}</div>`;
+  }
+
+  const dmTag = msg.room && msg.room.startsWith("dm") && !STATE.dmTarget
+    ? '<span style="font-size:10px;color:var(--accent);padding:0 6px;">💬私聊</span>'
+    : "";
+
+  div.innerHTML = \`
+    <div class="msg-avatar \${adminCls}">\${initial}</div>
+    <div class="msg-content">
+      <div class="msg-meta">
+        <span class="author">\${escapeHtml(msg.display_name || msg.username)}</span>
+        \${msg.is_admin ? '<span class="badge admin-badge" style="font-size:9px;padding:0 6px;">管理员</span>' : ''}
+        \${dmTag}
+      </div>
+      \${forwardLabel}
+      \${bubble}
+      <div class="msg-row-actions">
+        <button class="msg-action-btn" onclick="forwardMessage('\${msg.id}')" title="转发">↻</button>
+        <span class="msg-time">\${msg.time}</span>
+      </div>
+    </div>
+  \`;
+
+  if (STATE.user?.is_admin) {
+    const del = document.createElement("button");
+    del.className = "msg-del-btn";
+    del.textContent = "✕";
+    del.onclick = () => deleteMessage(msg.id);
+    div.querySelector(".msg-content").appendChild(del);
+  }
+
+  area.appendChild(div);
+}
+
+function renderSystemMsgfunction renderSystemMsg(msg) {
+  const area = document.getElementById("messages-area");
+  const d = document.createElement("div");
+  d.className = "system-msg";
+  d.innerHTML = `<span>${escapeHtml(msg.text)}</span>`;
+  area.appendChild(d);
+}
+
+// ── QR Code ───────────────────────────────────────────────────
+function showQr(fileId, filename) {
+  const host = STATE.serverInfo?.host || window.location.origin;
+  const url = host + "/api/files/" + fileId + "/" + encodeURIComponent(filename);
+  const box = document.getElementById("qr-popup-container");
+  box.innerHTML = `<div class="qr-popup" onclick="if(event.target===this)closeQrPopup()">
+    <div class="qr-box">
+      <div id="qr-canvas"></div>
+      <div class="text">📱 扫码下载</div>
+      <div class="sub">${host.replace(/^https?:\/\//, '')}/…/${escapeHtml(filename)}</div>
+    </div>
+  </div>`;
+  new QRCode(document.getElementById("qr-canvas"), {
+    text: url, width: 200, height: 200,
+    colorDark: "#1a1a1a", colorLight: "#ffffff",
+  });
+}
+
+// ── Permanent toggle ──────────────────────────────────────────
+async function togglePermanent(fileId, permanent) {
+  if (!STATE.user) return;
+  const res = await api("POST", "/api/permanent", {
+    username: STATE.user.username,
+    file_id: fileId,
+    permanent,
+  });
+  if (res.ok) {
+    toast(permanent ? "已设为永久保留" : "已取消永久保留", "success");
+    loadMessages();
+    loadFileList();
+  } else {
+    toast(res.error || "操作失败", "error");
+  }
+}
+
+// ── Send ──────────────────────────────────────────────────────
+function sendMessage() {
+  const input = document.getElementById("msg-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  STATE.socket.emit("new_message", { text });
+  autoResize(input);
+  stopTyping();
+}
+
+function onInputKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (!STATE.isTyping) { STATE.isTyping = true; STATE.socket.emit("typing", { typing: true }); }
+  clearTimeout(STATE.typingTimeout);
+  STATE.typingTimeout = setTimeout(stopTyping, 2000);
+}
+
+function stopTyping() {
+  STATE.isTyping = false;
+  STATE.socket?.emit("typing", { typing: false });
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 120) + "px";
+}
+
+function scrollToBottom() {
+  const area = document.getElementById("messages-area");
+  requestAnimationFrame(() => { area.scrollTop = area.scrollHeight; });
+}
+
+// ── File Transfer ─────────────────────────────────────────────
+async function uploadFile(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+  input.value = "";
+  const form = new FormData();
+  form.append("file", file);
+  form.append("username", STATE.user.username);
+  const res = await api("POST", "/api/upload", form);
+  if (!res.ok) { toast(res.error || "上传失败", "error"); return; }
+  const fi = res.file;
+  STATE.files.unshift(fi);
+  renderFileList();
+  STATE.socket.emit("new_message", { text: "📎 " + fi.name, file: fi });
+  toast("文件已发送", "success");
+  loadStorageStats();
+}
+
+function downloadFile(id, name) {
+  window.open(`/api/files/${id}/${encodeURIComponent(name)}`, "_blank");
+}
+
+async function loadFileList() {
+  const data = await api("GET", "/api/files-list");
+  STATE.files = data;
+  renderFileList();
+}
+
+function renderFileList() {
+  const el = document.getElementById("file-list");
+  const count = document.getElementById("file-count");
+  if (!STATE.files.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📁</div><div class="text">暂无文件</div></div>`;
+    count.textContent = "0";
+    return;
+  }
+  count.textContent = STATE.files.length;
+  el.innerHTML = STATE.files.map(f => `
+    <div class="file-item">
+      <div class="fi-icon">${f.is_image ? '🖼' : '📄'}</div>
+      <div class="fi-info">
+        <div class="fi-name">${escapeHtml(f.name)} ${f.permanent ? '<span style="color:var(--orange);font-size:10px;">★</span>' : ''}</div>
+        <div class="fi-meta">${f.size_display} · ${escapeHtml(f.uploaded_by || '?')}</div>
+      </div>
+      <div class="fi-actions">
+        <button class="btn-icon" title="二维码" onclick="showQr('${f.id}','${escapeHtml(f.name)}')" style="font-size:12px;">📱</button>
+        <button class="btn-icon" title="${f.permanent ? '取消永久' : '永久保留'}" onclick="togglePermanent('${f.id}', ${!f.permanent})" style="font-size:12px;">${f.permanent ? '★' : '☆'}</button>
+        <button class="btn-icon" title="下载" onclick="downloadFile('${f.id}','${escapeHtml(f.name)}')" style="font-size:12px;">⬇</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+// ── Storage Stats ─────────────────────────────────────────────
+async function loadStorageStats() {
+  if (!STATE.user) return;
+  const u = await api("GET", "/api/users");
+  const me = u.find(x => x.username === STATE.user.username);
+  if (!me) return;
+  const used = me.storage_used || 0;
+  const quota = me.storage_quota || DEFAULT_QUOTA;
+  const usedDisp = me.storage_used_display || "0B";
+  const quotaDisp = me.storage_quota_display || "10GB";
+  const pct = quota > 0 ? Math.min(100, (used / quota) * 100) : 0;
+  document.getElementById("storage-used-text").textContent = `存储 ${usedDisp} / ${quotaDisp}`;
+  document.getElementById("storage-percent-text").textContent = quota === -1 ? "∞" : `${Math.round(pct)}%`;
+  const bar = document.getElementById("storage-bar-fill");
+  bar.style.width = quota === -1 ? "100%" : Math.min(pct, 100) + "%";
+  bar.className = "storage-bar-fill" + (pct > 90 ? " danger" : pct > 70 ? " warn" : "");
+}
+
+// ── Online list ───────────────────────────────────────────────
+function renderOnlineList(list) {
+  const el = document.getElementById("user-list");
+  document.getElementById("online-count").textContent = list.length;
+  const myName = STATE.user?.username;
+  el.innerHTML = list.map(u => {
+    const isMe = u.username === myName;
+    const initial = (u.display_name || u.username)[0].toUpperCase();
+    return `<div class="user-item">
+      <div class="avatar-mini ${u.is_admin ? 'admin' : ''}">${initial}</div>
+      <div class="name">${escapeHtml(u.display_name || u.username)}${isMe ? ' <span style="color:var(--text3);font-size:11px;">(你)</span>' : ''}</div>
+      ${u.is_admin ? '<span class="admin-tag">管理</span>' : ''}
+      ${!isMe ? `<button class="dm-btn" onclick="startDm('${u.username}')" title="私聊">💬</button>` : ''}
+    </div>`;
+  }).join("");
+}
+
+// ── Panel switching ───────────────────────────────────────────
+function switchPanel(name) {
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  if (name === "chat") {
+    document.getElementById("nav-chat").classList.add("active");
+    document.getElementById("main-panel").style.display = "flex";
+    document.getElementById("file-panel").classList.remove("show");
+  } else {
+    document.getElementById("nav-files").classList.add("active");
+    document.getElementById("main-panel").style.display = "none";
+    document.getElementById("file-panel").classList.add("show");
+  }
+}
+
+// ── Admin ─────────────────────────────────────────────────────
+function showAdminPanel() {
+  if (!STATE.user?.is_admin) { toast("无权限", "error"); return; }
+  const users = STATE.users;
+  showModal(`<div class="modal" style="width:min(520px,90vw);max-height:85vh;">
+    <h3>⚙ 管理员面板</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;">管理用户 · 存储配额 · 归档策略</p>
+    ${users.map(u => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+        <div style="flex:1;min-width:120px;">
+          <div style="font-size:14px;font-weight:500;">${escapeHtml(u.display_name || u.username)}</div>
+          <div style="font-size:11px;color:var(--text3);">@${escapeHtml(u.username)} ${u.is_admin ? '· 管理员' : ''} ${u.online ? '· 🟢在线' : ''}</div>
+          <div style="font-size:10px;color:var(--text3);">存储: ${u.storage_used_display} / ${u.storage_quota_display}</div>
+        </div>
+        ${u.is_admin ? '' : `
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="number" id="quota-${u.username}" value="${u.storage_quota > 0 ? Math.round(u.storage_quota/1073741824*10)/10 : 10}" min="0.1" step="0.1" style="width:70px;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+          <select id="quota-unit-${u.username}" style="padding:6px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;outline:none;">
+            <option value="1">GB</option>
+            <option value="0.001">MB</option>
+          </select>
+          <button class="btn btn-sm btn-secondary" onclick="adminSetQuota('${u.username}')">设置</button>
+          <button class="btn btn-sm btn-danger" onclick="adminDeleteUser('${u.username}')">删除</button>
+        </div>
+        `}
+      </div>
+    `).join('')}
+    <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-sm btn-secondary" onclick="adminClearMessages()">🗑 清空所有消息</button>
+      <button class="btn btn-sm btn-secondary" onclick="adminRunRetention()">🔄 立即执行归档</button>
+    </div>
+    <div style="margin-top:12px;font-size:12px;color:var(--text3);">
+      📋 自动归档策略：消息/文件超过30天自动压缩 → 超过60天自动删除 · 标记★永久保留的文件不受影响
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+    </div>
+  </div>`);
+}
+
+async function adminDeleteUser(username) {
+  if (!confirm(`确定删除用户 "${username}"？`)) return;
+  const res = await api("DELETE", "/api/admin/users", { username, admin_user: STATE.user.username });
+  if (!res.ok) { toast(res.error || "删除失败", "error"); return; }
+  toast(`用户 ${username} 已删除`, "success");
+  STATE.users = STATE.users.filter(u => u.username !== username);
+  closeModal();
+  showAdminPanel();
+}
+
+async function adminSetQuota(username) {
+  const val = parseFloat(document.getElementById("quota-" + username).value);
+  const unit = parseFloat(document.getElementById("quota-unit-" + username).value);
+  if (isNaN(val) || val <= 0) { toast("请输入有效数值", "error"); return; }
+  const bytes = Math.round(val * unit * 1024 * 1024 * 1024);
+  const res = await api("POST", "/api/admin/quota", {
+    admin_user: STATE.user.username,
+    username,
+    quota: bytes,
+  });
+  if (res.ok) {
+    toast(`已设置 ${username} 的配额`, "success");
+    closeModal();
+    showAdminPanel();
+    loadStorageStats();
+  } else {
+    toast(res.error || "设置失败", "error");
+  }
+}
+
+function adminClearMessages() {
+  if (!confirm("确定清空所有聊天记录？")) return;
+  STATE.socket.emit("clear_messages");
+  toast("消息已清空", "success");
+  closeModal();
+}
+
+function adminRunRetention() {
+  toast("归档任务将在1小时内自动执行", "info");
+  closeModal();
+}
+
+function deleteMessage(id) {
+  if (!confirm("删除此消息？")) return;
+  STATE.socket.emit("delete_message", { id });
+}
+
+function clearChat() {
+  if (!STATE.user?.is_admin) { toast("仅管理员可清空聊天", "error"); return; }
+  adminClearMessages();
+}
+
+// ── Drag & drop ───────────────────────────────────────────────
+let dragCounter = 0;
+document.addEventListener("dragenter", (e) => { dragCounter++; document.getElementById("drag-overlay").classList.add("show"); });
+document.addEventListener("dragleave", (e) => { dragCounter--; if (dragCounter <= 0) { dragCounter = 0; document.getElementById("drag-overlay").classList.remove("show"); } });
+document.addEventListener("dragover", (e) => e.preventDefault());
+document.addEventListener("drop", (e) => {
+  e.preventDefault(); dragCounter = 0;
+  document.getElementById("drag-overlay").classList.remove("show");
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    const input = document.getElementById("file-input");
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    input.files = dt.files;
+    uploadFile(input);
+  }
+});
+
+// ── Desktop Notification + Sound ────────────────────────────
+function showNotification(title, body) {
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    const n = new Notification("LAN Chat - " + title, {
+      body: body,
+      icon: "/favicon.ico",
+      tag: "lan-chat-msg",
+      requireInteraction: false,
+    });
+    n.onclick = () => { window.focus(); n.close(); };
+    playNotificationSound();
+  } else if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}
+
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 660;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  } catch (e) { /* silent fallback */ }
+}
+
+// ── Init ──────────────────────────────────────────────────────
+const DEFAULT_QUOTA = 10 * 1024 * 1024 * 1024;
+
+// Try auto-login first; if it fails, show login grid
+autoLogin().then(loggedIn => {
+  if (!loggedIn) {
+    loadUsers();
+  }
+});
+setInterval(loadUsers, 30000);
+</script>
+</body>
+</html>

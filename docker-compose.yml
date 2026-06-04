@@ -1,0 +1,15 @@
+version: "3.8"
+
+services:
+  lan-chat:
+    build: .
+    container_name: lan-chat
+    ports:
+      - "3333:3333"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - LAN_CHAT_ADMIN=admin
+      - LAN_CHAT_ADMIN_PASSWORD=admin123
+      - SECRET_KEY=change-this-to-a-random-string
+    restart: unless-stopped

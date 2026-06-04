@@ -1,0 +1,25 @@
+[
+  {
+    "id": "9c1e6d82",
+    "type": "text",
+    "username": "TestUser",
+    "display_name": "TestUser",
+    "is_admin": false,
+    "text": "你好！这是来自局域网聊天室的第一条消息 🎉",
+    "file": null,
+    "ts": 1780556068038,
+    "time": "14:54"
+  },
+  {
+    "id": "416c7c52",
+    "type": "text",
+    "username": "admin",
+    "display_name": "管理员",
+    "is_admin": true,
+    "text": "111",
+    "file": null,
+    "permanent": false,
+    "ts": 1780556956041,
+    "time": "15:09"
+  }
+]

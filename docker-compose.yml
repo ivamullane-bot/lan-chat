@@ -3,7 +3,7 @@ services:
     container_name: lan-chat
     restart: always
     network_mode: host
-    image: ghcr.io/ivamullane-bot/lan-chat:latest
+    build: .
     volumes:
       - /vol1/1000/docker/lan-chat/data:/app/data
     environment:
